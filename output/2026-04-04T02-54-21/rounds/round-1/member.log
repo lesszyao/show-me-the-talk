@@ -1,0 +1,5 @@
+=== STDOUT ===
+The background npm install task completed successfully (exit code 0) — this was already consumed earlier when I verified the build. Everything is done.
+[?25h
+
+=== STDERR ===

@@ -1,0 +1,5 @@
+=== STDOUT ===
+[?25h
+
+=== STDERR ===
+error: unknown option '--output-dir'

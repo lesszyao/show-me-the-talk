@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FOMO</title>
+  <script type="module" crossorigin src="/popup/popup.js"></script>
+  <link rel="stylesheet" crossorigin href="/popup/popup.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <span class="brand">FOMO</span>
+      <span id="statusDot" class="status-dot idle"></span>
+    </div>
+
+    <!-- Progress Ring -->
+    <div class="progress-section">
+      <svg class="progress-ring" width="120" height="120">
+        <circle
+          class="progress-ring-bg"
+          cx="60"
+          cy="60"
+          r="52"
+          fill="none"
+          stroke="#e5e7eb"
+          stroke-width="8"
+        />
+        <circle
+          id="progressCircle"
+          class="progress-ring-fill"
+          cx="60"
+          cy="60"
+          r="52"
+          fill="none"
+          stroke="#10b981"
+          stroke-width="8"
+          stroke-linecap="round"
+          stroke-dasharray="327"
+          stroke-dashoffset="327"
+          transform="rotate(-90 60 60)"
+        />
+      </svg>
+      <div class="progress-text">
+        <span id="progressNumber" class="progress-number">0</span>
+        <span class="progress-total">/20</span>
+      </div>
+    </div>
+
+    <!-- Current Action -->
+    <div id="currentAction" class="current-action">Ready</div>
+
+    <!-- Controls -->
+    <div class="controls">
+      <button id="btnStart" class="btn btn-start" title="Start">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+          <polygon points="4,2 14,8 4,14" />
+        </svg>
+      </button>
+      <button id="btnStop" class="btn btn-stop" title="Stop" disabled>
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+          <rect x="1" y="1" width="12" height="12" rx="1" />
+        </svg>
+      </button>
+      <button id="btnDownload" class="btn btn-download" title="Download Results" disabled>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M8 2v8M4 8l4 4 4-4" />
+          <path d="M2 12v2h12v-2" />
+        </svg>
+      </button>
+      <button id="btnLogs" class="btn btn-logs" title="Download Logs" disabled>
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2">
+          <rect x="2" y="1" width="10" height="12" rx="1" />
+          <line x1="4" y1="4" x2="10" y2="4" />
+          <line x1="4" y1="6.5" x2="10" y2="6.5" />
+          <line x1="4" y1="9" x2="8" y2="9" />
+        </svg>
+      </button>
+    </div>
+
+    <!-- Error Message -->
+    <div id="errorMessage" class="error-message" style="display: none;"></div>
+  </div>
+
+</body>
+</html>

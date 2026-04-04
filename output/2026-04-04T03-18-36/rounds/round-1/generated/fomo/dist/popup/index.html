@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FOMO</title>
+  <script type="module" crossorigin src="/popup/popup.js"></script>
+  <link rel="stylesheet" crossorigin href="/popup/popup.css">
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <span class="logo">FOMO</span>
+      <span class="status-dot" id="statusDot"></span>
+    </div>
+
+    <div class="progress-ring-container">
+      <svg class="progress-ring" width="120" height="120">
+        <circle
+          class="progress-ring-bg"
+          cx="60"
+          cy="60"
+          r="52"
+          fill="none"
+          stroke-width="6"
+        />
+        <circle
+          class="progress-ring-fill"
+          id="progressRing"
+          cx="60"
+          cy="60"
+          r="52"
+          fill="none"
+          stroke-width="6"
+          stroke-linecap="round"
+          transform="rotate(-90 60 60)"
+        />
+        <text
+          class="progress-text"
+          id="progressText"
+          x="60"
+          y="60"
+          text-anchor="middle"
+          dominant-baseline="central"
+        >0/20</text>
+      </svg>
+    </div>
+
+    <div class="current-action" id="currentAction">点击开始搜索 AI 热点</div>
+
+    <div class="button-group">
+      <button class="btn btn-play" id="btnPlay" title="开始搜索">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M4 2l10 6-10 6V2z"/>
+        </svg>
+      </button>
+      <button class="btn btn-stop" id="btnStop" title="停止" disabled>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+          <rect x="3" y="3" width="10" height="10" rx="1"/>
+        </svg>
+      </button>
+      <button class="btn btn-download" id="btnDownloadResults" title="下载结果" disabled>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M8 1v9M4 7l4 4 4-4M2 13h12"/>
+        </svg>
+      </button>
+      <button class="btn btn-download-log" id="btnDownloadLogs" title="下载日志" disabled>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M3 1h10v14H3V1zm2 3h6M5 7h6M5 10h4"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="error-message hidden" id="errorMessage"></div>
+  </div>
+
+</body>
+</html>

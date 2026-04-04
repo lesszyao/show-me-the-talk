@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"npx tsc 2>&1\",\"description\":\"Build to see actual errors\"}",
+  "error": "Exit code 2\nsrc/claude-cli.ts(93,17): error TS2304: Cannot find name 'data'.",
+  "timestamp": "2026-04-04T03:16:52.817Z",
+  "retry_count": 1
+}

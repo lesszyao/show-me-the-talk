@@ -1,0 +1,7 @@
+=== STDOUT ===
+
+
+The background `npm install` task also completed successfully (exit code 0). Everything is already built and verified — the project is ready to use.
+[?25h
+
+=== STDERR ===
