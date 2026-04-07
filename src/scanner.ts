@@ -178,6 +178,80 @@ function extractMetadata(targetDir: string): ProjectMetadata {
   return metadata;
 }
 
+/** Directories to exclude in core-only mode */
+const PERIPHERAL_DIRS = new Set([
+  "public", "static", "assets", "images", "img", "icons",
+  "docs", "doc", "documentation",
+  "test", "tests", "__tests__", "e2e", "cypress",
+  "fixtures", "mocks", "__mocks__",
+  ".github", ".circleci", ".husky",
+  "scripts", "examples", "samples",
+]);
+
+/** Extensions to exclude in core-only mode */
+const PERIPHERAL_EXTENSIONS = new Set([
+  ".md", ".txt", ".rst",
+  ".css", ".scss", ".less", ".sass", ".styl",
+  ".json", // except package.json/tsconfig.json (handled separately)
+  ".yaml", ".yml", ".toml",
+  ".env", ".env.example",
+  ".sh", ".bat", ".cmd",
+]);
+
+/** Files to always include in core-only mode */
+const CORE_KEEP_FILES = new Set([
+  "package.json",
+  "tsconfig.json",
+  "vite.config.js", "vite.config.ts",
+  "webpack.config.js", "webpack.config.ts",
+  "next.config.js", "next.config.ts", "next.config.mjs",
+  "nuxt.config.js", "nuxt.config.ts",
+  "rollup.config.js", "rollup.config.ts",
+]);
+
+/** Source code extensions to include in core-only mode */
+const SOURCE_EXTENSIONS = new Set([
+  ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs",
+  ".py", ".go", ".rs", ".java", ".kt", ".swift",
+  ".c", ".cpp", ".h", ".hpp", ".cs",
+  ".rb", ".php", ".vue", ".svelte",
+]);
+
+/** Filter scan result to core source files only */
+export function getCoreFiles(scanResult: ScanResult): ScanResult {
+  const coreFiles = scanResult.files.filter((f) => {
+    // Always exclude tests (priority 4-5)
+    if (f.priority >= 4) return false;
+
+    const basename = path.basename(f.relativePath);
+    const ext = path.extname(f.relativePath).toLowerCase();
+    const parts = f.relativePath.split(path.sep);
+
+    // Always include whitelisted config files
+    if (CORE_KEEP_FILES.has(basename)) return true;
+
+    // Exclude files in peripheral directories
+    if (parts.some((p) => PERIPHERAL_DIRS.has(p))) return false;
+
+    // Exclude peripheral extensions
+    if (PERIPHERAL_EXTENSIONS.has(ext)) return false;
+
+    // Include source code files
+    if (SOURCE_EXTENSIONS.has(ext)) return true;
+
+    // Include extensionless files at root (entry points like Makefile, Dockerfile)
+    if (!ext && parts.length === 1) return true;
+
+    return false;
+  });
+
+  return {
+    files: coreFiles,
+    metadata: scanResult.metadata,
+    fileCount: coreFiles.length,
+  };
+}
+
 export function scan(targetDir: string): ScanResult {
   const absDir = path.resolve(targetDir);
 

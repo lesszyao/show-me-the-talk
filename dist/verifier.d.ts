@@ -5,8 +5,11 @@ export interface VerifierCallbacks {
     onTalkGenerated?: (talk: Talk) => void;
     onMemberStart?: (round: number) => void;
     onMemberComplete?: (round: number, timedOut: boolean) => void;
+    onComparisonStart?: (round: number) => void;
     onComparisonComplete?: (round: number, score: number, threshold: number) => void;
     onRefining?: (round: number) => void;
+    onSkipRound?: (round: number, score: number) => void;
+    onSkipMember?: (round: number) => void;
 }
 export declare class Verifier {
     private analyzer;

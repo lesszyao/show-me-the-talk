@@ -1,8 +1,10 @@
 import type { ScanResult, Talk } from "./types.js";
+/** Read all .md files from a directory, sort by name, concatenate */
+export declare function readTalkFiles(dir: string): string;
 export declare class Analyzer {
     private cli;
     private model?;
     constructor(cli: string, model?: string);
-    generate(targetDir: string, scanResult: ScanResult): Promise<Talk>;
-    refine(targetDir: string, talk: Talk, feedback: string): Promise<Talk>;
+    generate(targetDir: string, scanResult: ScanResult, coreOnly?: boolean): Promise<Talk>;
+    refine(targetDir: string, talk: Talk, reportPath: string, coreOnly?: boolean): Promise<Talk>;
 }

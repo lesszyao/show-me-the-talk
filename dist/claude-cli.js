@@ -1,14 +1,20 @@
 import { spawn } from "node:child_process";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 export async function runCli(options) {
     const maxRetries = options.maxRetries ?? 3;
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
-            const result = await spawnCli(options);
+            if (attempt > 1) {
+                console.log(`  [cli] Retry ${attempt}/${maxRetries}...`);
+            }
+            const result = await spawnCli(options, attempt);
             if (result.exitCode !== 0) {
                 throw new Error(`CLI exited with code ${result.exitCode}: ${result.stderr.slice(0, 500)}`);
             }
             const output = result.stdout.trim();
-            if (!output) {
+            if (!output && !options.allowEmptyOutput) {
                 throw new Error("CLI returned empty output");
             }
             return output;
@@ -18,16 +24,17 @@ export async function runCli(options) {
                 throw new Error(`CLI failed after ${maxRetries} attempts: ${error instanceof Error ? error.message : String(error)}`);
             }
             const delay = Math.pow(2, attempt) * 1000;
+            console.log(`  [cli] Attempt ${attempt} failed: ${error instanceof Error ? error.message : String(error)}`);
             await new Promise((resolve) => setTimeout(resolve, delay));
         }
     }
     throw new Error("Unreachable");
 }
-function spawnCli(options) {
-    const { cli, prompt, systemPrompt, model, cwd, addDirs, timeout = 600_000 } = options;
+function spawnCli(options, attempt) {
+    const { cli, prompt, model, cwd, addDirs, dangerouslySkipPermissions, timeout = 1_800_000 } = options;
     const args = ["-p"];
-    if (systemPrompt) {
-        args.push("--system-prompt", systemPrompt);
+    if (dangerouslySkipPermissions) {
+        args.push("--dangerously-skip-permissions");
     }
     if (model) {
         args.push("--model", model);
@@ -37,11 +44,22 @@ function spawnCli(options) {
             args.push("--add-dir", dir);
         }
     }
+    const effectiveCwd = cwd || process.cwd();
+    const label = options.logLabel || "cli";
+    // Save prompt to log file
+    const logDir = options.logDir || fs.mkdtempSync(path.join(os.tmpdir(), "smtt-cli-log-"));
+    fs.mkdirSync(logDir, { recursive: true });
+    const promptLogFile = path.join(logDir, `${label}-prompt${attempt > 1 ? `-attempt${attempt}` : ""}.md`);
+    fs.writeFileSync(promptLogFile, prompt, "utf-8");
+    console.log(`  [${label}] Running: ${cli} ${args.join(" ")}`);
+    console.log(`  [${label}] CWD: ${effectiveCwd}`);
+    console.log(`  [${label}] Timeout: ${(timeout / 1000 / 60).toFixed(0)}min`);
+    console.log(`  [${label}] Prompt: ${promptLogFile} (${prompt.length} chars)`);
     return new Promise((resolve, reject) => {
         let stdoutBuf = "";
         let stderrBuf = "";
         const child = spawn(cli, args, {
-            cwd: cwd || process.cwd(),
+            cwd: effectiveCwd,
             env: { ...process.env },
             stdio: ["pipe", "pipe", "pipe"],
         });
@@ -64,6 +82,12 @@ function spawnCli(options) {
         });
         child.on("close", (code) => {
             clearTimeout(timer);
+            // Save output log
+            const outputLogFile = path.join(logDir, `${label}-output${attempt > 1 ? `-attempt${attempt}` : ""}.log`);
+            const logContent = `=== EXIT CODE: ${code} ===\n\n=== STDOUT (${stdoutBuf.length} chars) ===\n${stdoutBuf}\n\n=== STDERR (${stderrBuf.length} chars) ===\n${stderrBuf}`;
+            fs.writeFileSync(outputLogFile, logContent, "utf-8");
+            console.log(`  [${label}] Done: exit=${code}, stdout=${stdoutBuf.length} chars, stderr=${stderrBuf.length} chars`);
+            console.log(`  [${label}] Output log: ${outputLogFile}`);
             resolve({ stdout: stdoutBuf, stderr: stderrBuf, exitCode: code });
         });
         child.on("error", (err) => {

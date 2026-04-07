@@ -5,4 +5,4 @@ export interface MemberResult {
     timedOut: boolean;
     exitCode: number | null;
 }
-export declare function execute(talk: Talk, cli: string, timeout: number, logDir: string): Promise<MemberResult>;
+export declare function execute(talk: Talk, cli: string, timeout: number, logDir: string, coreOnly?: boolean): Promise<MemberResult>;

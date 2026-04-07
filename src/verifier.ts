@@ -2,6 +2,7 @@ import type { AnalysisReport, RoundResult, ScanResult, SmttOptions, Talk } from 
 import { Analyzer } from "./analyzer.js";
 import { Comparator } from "./comparator.js";
 import { Reporter } from "./reporter.js";
+import { getCoreFiles } from "./scanner.js";
 import * as member from "./member.js";
 
 export interface VerifierCallbacks {
@@ -9,8 +10,11 @@ export interface VerifierCallbacks {
   onTalkGenerated?: (talk: Talk) => void;
   onMemberStart?: (round: number) => void;
   onMemberComplete?: (round: number, timedOut: boolean) => void;
+  onComparisonStart?: (round: number) => void;
   onComparisonComplete?: (round: number, score: number, threshold: number) => void;
   onRefining?: (round: number) => void;
+  onSkipRound?: (round: number, score: number) => void;
+  onSkipMember?: (round: number) => void;
 }
 
 export class Verifier {
@@ -38,41 +42,104 @@ export class Verifier {
   ): Promise<AnalysisReport> {
     const startTime = Date.now();
     const results: RoundResult[] = [];
+    const isResume = !!this.options.resume;
+    const coreOnly = this.options.coreOnly;
 
-    // Generate initial talk
-    this.callbacks.onTalkGenerated?.({
-      version: 0,
-      content: "",
-      generatedAt: "",
-    });
+    // Filter to core files if core-only mode
+    const effectiveScan = coreOnly ? getCoreFiles(scanResult) : scanResult;
 
-    let talk = await this.analyzer.generate(targetDir, scanResult);
-    this.reporter.writeTalk(talk);
-    this.callbacks.onTalkGenerated?.(talk);
+    if (coreOnly) {
+      console.log(`  [verifier] Core-only mode: ${effectiveScan.fileCount} core files (from ${scanResult.fileCount} total)`);
+    }
+
+    // Resolve initial talk
+    let talk: Talk;
+
+    if (isResume) {
+      const latestVersion = this.reporter.getLatestTalkVersion();
+      if (latestVersion > 0) {
+        talk = this.reporter.readTalk(latestVersion)!;
+        this.callbacks.onTalkGenerated?.(talk);
+      } else {
+        // No talk found in session, generate fresh
+        this.callbacks.onTalkGenerated?.({ version: 0, content: "", contentDir: "", generatedAt: "" });
+        talk = await this.analyzer.generate(targetDir, effectiveScan, coreOnly);
+        this.reporter.writeTalk(talk);
+        this.callbacks.onTalkGenerated?.(talk);
+      }
+    } else {
+      this.callbacks.onTalkGenerated?.({ version: 0, content: "", contentDir: "", generatedAt: "" });
+      talk = await this.analyzer.generate(targetDir, effectiveScan, coreOnly);
+      this.reporter.writeTalk(talk);
+      this.callbacks.onTalkGenerated?.(talk);
+    }
 
     for (let round = 1; round <= this.options.maxRounds; round++) {
       const roundStart = Date.now();
       this.callbacks.onRoundStart?.(round, this.options.maxRounds);
 
-      // Ensure round directory exists
+      // Resume: check if this round is already fully done
+      if (isResume) {
+        const existing = this.reporter.readComparison(round);
+        if (existing && existing.score > 0) {
+          // Round fully complete — skip
+          const result: RoundResult = {
+            round,
+            talk,
+            generatedDir: this.reporter.getGeneratedCodeDir(round),
+            score: existing.score,
+            feedback: existing.feedback,
+            dimensions: existing.dimensions,
+            duration: 0,
+          };
+          results.push(result);
+          this.callbacks.onSkipRound?.(round, existing.score);
+
+          if (existing.score >= this.options.threshold) {
+            break;
+          }
+
+          // Load refined talk for next round if it exists
+          const nextTalk = this.reporter.readTalk(talk.version + 1);
+          if (nextTalk) talk = nextTalk;
+          continue;
+        }
+      }
+
       const roundDir = this.reporter.ensureRoundDir(round);
 
-      // Execute member
-      this.callbacks.onMemberStart?.(round);
-      const memberResult = await member.execute(
-        talk,
-        this.options.cli,
-        this.options.timeout,
-        roundDir,
-      );
-      this.callbacks.onMemberComplete?.(round, memberResult.timedOut);
+      // Resume: check if member code exists but comparison is missing
+      let generatedDir: string;
+      let memberTimedOut = false;
 
-      // Handle timeout: score 0
-      if (memberResult.timedOut) {
+      if (isResume && this.reporter.hasGeneratedCode(round)) {
+        // Skip member, use existing generated code
+        generatedDir = this.reporter.getGeneratedCodeDir(round);
+        this.callbacks.onSkipMember?.(round);
+      } else {
+        // Execute member
+        this.callbacks.onMemberStart?.(round);
+        const memberResult = await member.execute(
+          talk,
+          this.options.cli,
+          this.options.timeout,
+          roundDir,
+          coreOnly,
+        );
+        this.callbacks.onMemberComplete?.(round, memberResult.timedOut);
+        generatedDir = memberResult.generatedDir;
+        memberTimedOut = memberResult.timedOut;
+
+        // Save generated code
+        this.reporter.copyGeneratedCode(round, generatedDir);
+      }
+
+      // Handle timeout
+      if (memberTimedOut) {
         const result: RoundResult = {
           round,
           talk,
-          generatedDir: memberResult.generatedDir,
+          generatedDir,
           score: 0,
           feedback: "Member timed out. No code was generated in time.",
           dimensions: {
@@ -90,26 +157,20 @@ export class Verifier {
 
         if (round < this.options.maxRounds) {
           this.callbacks.onRefining?.(round);
-          talk = await this.analyzer.refine(
-            targetDir,
-            talk,
-            "The previous attempt timed out. Simplify the description to focus on the most essential structure and logic.",
-          );
+          talk = await this.analyzer.refine(targetDir, talk, "", coreOnly);
           this.reporter.writeTalk(talk);
         }
         continue;
       }
 
       // Compare
-      const comparison = await this.comparator.compare(
-        targetDir,
-        memberResult.generatedDir,
-      );
+      this.callbacks.onComparisonStart?.(round);
+      const comparison = await this.comparator.compare(targetDir, generatedDir, roundDir, coreOnly);
 
       const result: RoundResult = {
         round,
         talk,
-        generatedDir: memberResult.generatedDir,
+        generatedDir,
         score: comparison.score,
         feedback: comparison.feedback,
         dimensions: comparison.dimensions,
@@ -119,9 +180,8 @@ export class Verifier {
       results.push(result);
       this.reporter.writeComparison(round, result);
 
-      // Copy generated code if keeping all rounds or this could be the best
-      if (this.options.keepGenerated) {
-        this.reporter.copyGeneratedCode(round, memberResult.generatedDir);
+      if (this.options.keepGenerated && !isResume) {
+        this.reporter.copyGeneratedCode(round, generatedDir);
       }
 
       this.callbacks.onComparisonComplete?.(
@@ -130,19 +190,14 @@ export class Verifier {
         this.options.threshold,
       );
 
-      // Check threshold
       if (comparison.score >= this.options.threshold) {
-        // Copy the winning round's code
-        if (!this.options.keepGenerated) {
-          this.reporter.copyGeneratedCode(round, memberResult.generatedDir);
-        }
         break;
       }
 
       // Refine for next round
       if (round < this.options.maxRounds) {
         this.callbacks.onRefining?.(round);
-        talk = await this.analyzer.refine(targetDir, talk, comparison.feedback);
+        talk = await this.analyzer.refine(targetDir, talk, comparison.reportPath, coreOnly);
         this.reporter.writeTalk(talk);
       }
     }
@@ -151,11 +206,6 @@ export class Verifier {
     const bestResult = results.reduce((best, r) =>
       r.score > best.score ? r : best,
     );
-
-    // Copy best round's code if not already copied
-    if (!this.options.keepGenerated && bestResult.score < this.options.threshold) {
-      this.reporter.copyGeneratedCode(bestResult.round, bestResult.generatedDir);
-    }
 
     const report: AnalysisReport = {
       targetDir,

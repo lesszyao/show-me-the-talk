@@ -1,7 +1,10 @@
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 import { runCli } from "./claude-cli.js";
-import type { ScanResult, SmttOptions, Talk } from "./types.js";
+import type { ScanResult, Talk } from "./types.js";
 
-const SYSTEM_PROMPT = `你是一名资深软件架构师。你的任务是分析当前工作目录下的代码库，生成一份纯自然语言的项目描述（"talk"）。
+const ROLE_CONTEXT = `你是一名资深软件架构师。你的任务是分析代码库，生成一份纯自然语言的项目描述（"talk"）。
 
 这份描述必须足够详细，让一个完全没有上下文的开发者仅凭描述就能重建出结构等价的代码库。
 
@@ -17,7 +20,7 @@ const SYSTEM_PROMPT = `你是一名资深软件架构师。你的任务是分析
 - 包含 CLI 参数、配置选项和错误处理行为
 - 描述边界情况和异常处理`;
 
-const REFINE_SYSTEM = `你是一名资深软件架构师，正在根据对比反馈来改进项目描述。
+const REFINE_CONTEXT = `你是一名资深软件架构师，正在根据对比反馈来改进项目描述。
 
 你之前的描述被另一个开发者用来重建代码库，对比发现了差距。
 请改进描述以解决反馈中指出的问题，保持纯自然语言（不要包含代码片段）。`;
@@ -39,6 +42,18 @@ function formatMetadata(metadata: ScanResult["metadata"]): string {
   return parts.join("\n") || "无元数据";
 }
 
+/** Read all .md files from a directory, sort by name, concatenate */
+export function readTalkFiles(dir: string): string {
+  if (!fs.existsSync(dir)) return "";
+  const files = fs.readdirSync(dir)
+    .filter((f) => f.endsWith(".md"))
+    .sort();
+  if (files.length === 0) return "";
+  return files
+    .map((f) => fs.readFileSync(path.join(dir, f), "utf-8"))
+    .join("\n\n");
+}
+
 export class Analyzer {
   private cli: string;
   private model?: string;
@@ -48,9 +63,28 @@ export class Analyzer {
     this.model = model;
   }
 
-  async generate(targetDir: string, scanResult: ScanResult): Promise<Talk> {
-    const prompt = `请分析当前工作目录下的代码库，生成一份完整的自然语言项目描述。
+  async generate(targetDir: string, scanResult: ScanResult, coreOnly = false): Promise<Talk> {
+    const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "smtt-talk-"));
 
+    const coreOnlyInstruction = coreOnly
+      ? `\n注意：本次分析采用 core-only 模式。请重点描述：
+- 核心源码模块（src/、lib/ 下的主要文件）
+- 技术栈和依赖（package.json 中的 dependencies）
+- 核心数据流和模块间调用关系
+- 入口文件和 CLI 接口
+
+可以略写或跳过：
+- 测试文件和测试配置
+- 文档文件（README、*.md）
+- 静态资源（图片、字体、CSS/SCSS）
+- CI/CD 配置（.github/、.circleci/）
+- 示例和 fixture 文件\n`
+      : "";
+
+    const prompt = `${ROLE_CONTEXT}
+
+请分析当前工作目录下的代码库，生成一份完整的自然语言项目描述。
+${coreOnlyInstruction}
 项目基本信息：
 ${formatMetadata(scanResult.metadata)}
 
@@ -70,49 +104,126 @@ ${formatFileList(scanResult.files)}
 8. 错误处理策略
 9. 配置和默认值
 
-记住：不要包含代码片段，纯自然语言。`;
+输出方式（二选一，推荐方式一）：
+方式一（推荐）：将描述按章节写入以下目录中的 .md 文件：${outputDir}
+  - 每个章节一个文件，按编号命名，例如：01-项目概述.md、02-技术栈.md、03-目录结构.md 等
+  - 使用 Write 工具写入，可以边分析边写入
+方式二：如果无法写入文件，则直接在回复中输出完整描述全文（不要只输出总结）
 
-    const content = await runCli({
+不要包含代码片段，纯自然语言。`;
+
+    const stdout = await runCli({
       cli: this.cli,
       prompt,
-      systemPrompt: SYSTEM_PROMPT,
       model: this.model,
       cwd: targetDir,
+      dangerouslySkipPermissions: true,
+      allowEmptyOutput: true,
+      logDir: outputDir,
+      logLabel: "analyzer-generate",
     });
+
+    // Prefer file-based output, fall back to stdout
+    const fileContent = readTalkFiles(outputDir);
+    const content = fileContent || stdout;
+
+    if (!content) {
+      throw new Error(
+        `Analyzer produced no output. Output dir: ${outputDir}, stdout length: ${stdout.length}`,
+      );
+    }
+
+    if (fileContent) {
+      console.log(`  [analyzer] Output: ${fs.readdirSync(outputDir).filter(f => f.endsWith(".md")).length} files in ${outputDir}`);
+    } else {
+      console.log(`  [analyzer] Output: stdout (${stdout.length} chars, no files written)`);
+    }
 
     return {
       version: 1,
       content,
+      contentDir: fileContent ? outputDir : "",
       generatedAt: new Date().toISOString(),
     };
   }
 
-  async refine(targetDir: string, talk: Talk, feedback: string): Promise<Talk> {
-    const prompt = `当前的项目描述（第 ${talk.version} 版）如下：
+  async refine(targetDir: string, talk: Talk, reportPath: string, coreOnly = false): Promise<Talk> {
+    const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "smtt-talk-"));
+    const absTarget = path.resolve(targetDir);
 
----
-${talk.content}
----
+    const prevDir = talk.contentDir;
+    const addDirs = [absTarget];
+    if (prevDir && fs.existsSync(prevDir)) {
+      addDirs.push(prevDir);
+    }
+    if (reportPath && fs.existsSync(path.dirname(reportPath))) {
+      addDirs.push(path.dirname(reportPath));
+    }
 
-对比反馈如下：
+    const reportInstruction = reportPath
+      ? `差异报告文件在：${reportPath}\n请用 Read 工具读取这份报告，了解上一轮生成代码与原始代码的具体差异。`
+      : "";
 
-${feedback}
+    const prevInstruction = prevDir
+      ? `当前的项目描述文件在目录：${prevDir}\n请先用 Read 工具读取该目录下的所有 .md 文件，了解当前描述内容。`
+      : `当前的项目描述（第 ${talk.version} 版）如下：\n\n---\n${talk.content}\n---`;
 
-请使用 Read、Glob 等工具重新阅读当前工作目录下的代码，然后根据反馈改进描述。
-重点关注生成代码与原始代码差异最大的部分。
-保持纯自然语言，不要包含代码片段。`;
+    const coreOnlyInstruction = coreOnly
+      ? `\n注意：本次采用 core-only 模式，只关注核心源码和技术栈。忽略测试、文档、静态资源等方面的差异。\n`
+      : "";
 
-    const content = await runCli({
+    const prompt = `${REFINE_CONTEXT}
+
+${prevInstruction}
+
+${reportInstruction}
+
+代码库位于：${absTarget}
+${coreOnlyInstruction}
+请根据差异报告中指出的问题改进描述。重点关注：
+- 报告中标注的缺失模块或文件
+- 实现方式描述不准确的地方
+- 技术选型、配置等细节的遗漏
+
+输出方式（二选一，推荐方式一）：
+方式一（推荐）：将改进后的描述按章节写入当前工作目录下的 .md 文件
+  - 每个章节一个文件，按编号命名，例如：01-项目概述.md、02-技术栈.md、03-目录结构.md 等
+  - 使用 Write 工具写入，可以边分析边写入
+方式二：如果无法写入文件，则直接在回复中输出改进后的完整描述全文（不要只输出总结）
+
+不要包含代码片段，纯自然语言。`;
+
+    const stdout = await runCli({
       cli: this.cli,
       prompt,
-      systemPrompt: REFINE_SYSTEM,
       model: this.model,
-      cwd: targetDir,
+      cwd: outputDir,
+      addDirs,
+      dangerouslySkipPermissions: true,
+      allowEmptyOutput: true,
+      logDir: outputDir,
+      logLabel: "analyzer-refine",
     });
+
+    const fileContent = readTalkFiles(outputDir);
+    const content = fileContent || stdout;
+
+    if (!content) {
+      throw new Error(
+        `Analyzer refine produced no output. Output dir: ${outputDir}, stdout length: ${stdout.length}`,
+      );
+    }
+
+    if (fileContent) {
+      console.log(`  [analyzer] Refined: ${fs.readdirSync(outputDir).filter(f => f.endsWith(".md")).length} files in ${outputDir}`);
+    } else {
+      console.log(`  [analyzer] Refined: stdout (${stdout.length} chars, no files written)`);
+    }
 
     return {
       version: talk.version + 1,
       content,
+      contentDir: fileContent ? outputDir : "",
       generatedAt: new Date().toISOString(),
     };
   }

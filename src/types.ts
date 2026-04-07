@@ -1,6 +1,9 @@
 export interface Talk {
   version: number;
+  /** Concatenated content from all talk files (for display/logging) */
   content: string;
+  /** Directory containing the talk .md files */
+  contentDir: string;
   generatedAt: string;
 }
 
@@ -60,10 +63,15 @@ export interface SmttOptions {
   keepGenerated: boolean;
   model?: string;
   verbose: boolean;
+  resume?: string;
+  /** When true (default), only generate and verify core source files */
+  coreOnly: boolean;
 }
 
 export interface ComparisonResult {
   score: number;
   dimensions: DimensionScores;
   feedback: string;
+  /** Path to the detailed diff report .md file */
+  reportPath: string;
 }

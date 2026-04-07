@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1775208853287,
+  "lastScanned": 1775530219330,
   "projectRoot": "/Users/yaozhou/workspace/show-me-the-talk",
   "techStack": {
     "languages": [
@@ -49,7 +49,10 @@
       "docs",
       "src"
     ],
-    "gitBranches": null
+    "gitBranches": {
+      "defaultBranch": "main",
+      "branchingStrategy": null
+    }
   },
   "customNotes": [],
   "directoryMap": {
@@ -57,7 +60,7 @@
       "path": "dist",
       "purpose": "Distribution/build output",
       "fileCount": 27,
-      "lastAccessed": 1775208853256,
+      "lastAccessed": 1775530219307,
       "keyFiles": [
         "analyzer.d.ts",
         "analyzer.js",
@@ -70,14 +73,30 @@
       "path": "docs",
       "purpose": "Documentation",
       "fileCount": 0,
-      "lastAccessed": 1775208853261,
+      "lastAccessed": 1775530219310,
+      "keyFiles": []
+    },
+    "imgs": {
+      "path": "imgs",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1775530219310,
+      "keyFiles": [
+        "01-flowchart-collaboration.png"
+      ]
+    },
+    "output": {
+      "path": "output",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1775530219311,
       "keyFiles": []
     },
     "src": {
       "path": "src",
       "purpose": "Source code",
       "fileCount": 9,
-      "lastAccessed": 1775208853262,
+      "lastAccessed": 1775530219311,
       "keyFiles": [
         "analyzer.ts",
         "claude-cli.ts",
@@ -89,129 +108,27 @@
   },
   "hotPaths": [
     {
-      "path": "src/claude-cli.ts",
-      "accessCount": 17,
-      "lastAccessed": 1775274448999,
-      "type": "file"
-    },
-    {
-      "path": "",
-      "accessCount": 12,
-      "lastAccessed": 1775216131510,
-      "type": "directory"
-    },
-    {
-      "path": "src/cli.ts",
-      "accessCount": 11,
-      "lastAccessed": 1775278061776,
-      "type": "file"
-    },
-    {
       "path": "src/verifier.ts",
-      "accessCount": 10,
-      "lastAccessed": 1775274456180,
+      "accessCount": 8,
+      "lastAccessed": 1775530478738,
       "type": "file"
     },
     {
       "path": "src/analyzer.ts",
-      "accessCount": 9,
-      "lastAccessed": 1775272342324,
-      "type": "file"
-    },
-    {
-      "path": "src/member.ts",
-      "accessCount": 8,
-      "lastAccessed": 1775274456239,
-      "type": "file"
-    },
-    {
-      "path": "src/types.ts",
-      "accessCount": 6,
-      "lastAccessed": 1775274448991,
-      "type": "file"
-    },
-    {
-      "path": "package.json",
-      "accessCount": 6,
-      "lastAccessed": 1775274449044,
+      "accessCount": 5,
+      "lastAccessed": 1775530306311,
       "type": "file"
     },
     {
       "path": "src/comparator.ts",
       "accessCount": 5,
-      "lastAccessed": 1775272369053,
+      "lastAccessed": 1775530423566,
       "type": "file"
     },
     {
-      "path": "src/scanner.ts",
-      "accessCount": 5,
-      "lastAccessed": 1775272419145,
-      "type": "file"
-    },
-    {
-      "path": "src/reporter.ts",
-      "accessCount": 4,
-      "lastAccessed": 1775216988709,
-      "type": "file"
-    },
-    {
-      "path": "output/2026-04-03T09-34-12/rounds/round-1/comparison.json",
+      "path": "src/member.ts",
       "accessCount": 3,
-      "lastAccessed": 1775209984631,
-      "type": "file"
-    },
-    {
-      "path": "output/2026-04-03T09-34-12/talk-v1.md",
-      "accessCount": 3,
-      "lastAccessed": 1775209984770,
-      "type": "file"
-    },
-    {
-      "path": "docs/superpowers/specs/2026-04-03-show-me-the-talk-design.md",
-      "accessCount": 3,
-      "lastAccessed": 1775216180442,
-      "type": "file"
-    },
-    {
-      "path": "tsconfig.json",
-      "accessCount": 3,
-      "lastAccessed": 1775216936350,
-      "type": "file"
-    },
-    {
-      "path": "src",
-      "accessCount": 3,
-      "lastAccessed": 1775272505370,
-      "type": "directory"
-    },
-    {
-      "path": "output/2026-04-03T09-34-12/rounds/round-1/member.log",
-      "accessCount": 2,
-      "lastAccessed": 1775209882794,
-      "type": "file"
-    },
-    {
-      "path": ".claude/settings.local.json",
-      "accessCount": 1,
-      "lastAccessed": 1775216196363,
-      "type": "file"
-    },
-    {
-      "path": "output/2026-04-03T11-30-59/rounds/round-1/member.log",
-      "accessCount": 1,
-      "lastAccessed": 1775270912940,
-      "type": "file"
-    },
-    {
-      "path": "output/2026-04-03T11-30-59/rounds/round-1/comparison.json",
-      "accessCount": 1,
-      "lastAccessed": 1775270912997,
-      "type": "file"
-    },
-    {
-      "path": "docs/superpowers/specs/2026-04-04-show-me-the-talk-design-zh.md",
-      "accessCount": 1,
-      "lastAccessed": 1775274557398,
+      "lastAccessed": 1775530367952,
       "type": "file"
     }
   ],

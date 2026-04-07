@@ -12,7 +12,6 @@ import { Verifier } from "./verifier.js";
 import type { SmttOptions } from "./types.js";
 
 function preflightChecks(targetDir: string, cli: string): void {
-  // Check target directory
   const absTarget = path.resolve(targetDir);
   if (!fs.existsSync(absTarget)) {
     console.error(chalk.red(`Error: Target directory does not exist: ${absTarget}`));
@@ -23,14 +22,12 @@ function preflightChecks(targetDir: string, cli: string): void {
     process.exit(1);
   }
 
-  // Check for empty directory
   const entries = fs.readdirSync(absTarget).filter((e) => !e.startsWith("."));
   if (entries.length === 0) {
     console.error(chalk.red(`Error: Target directory is empty: ${absTarget}`));
     process.exit(1);
   }
 
-  // Check CLI availability
   try {
     execSync(`which ${cli}`, { stdio: "ignore" });
   } catch {
@@ -60,11 +57,13 @@ program
   .option("--max-rounds <n>", "Maximum iteration rounds", "5")
   .option("--threshold <n>", "Pass threshold 0-100", "70")
   .option("--cli <name>", "CLI command to use (claude, cfuse, codex, etc.)", "claude")
-  .option("--timeout <ms>", "Member execution timeout in ms", "600000")
+  .option("--timeout <ms>", "Member execution timeout in ms", "1800000")
   .option("--output <dir>", "Output directory", "./output")
   .option("--keep-generated", "Keep all rounds' generated code", false)
   .option("--model <id>", "Model for Analyzer/Comparator API calls")
+  .option("--full", "Full mode: generate and verify all files (default: core-only)", false)
   .option("--verbose", "Verbose logging", false)
+  .option("--resume <dir>", "Resume from an existing session directory")
   .action(async (targetDir: string, opts: Record<string, string | boolean>) => {
     const options: SmttOptions = {
       maxRounds: parseInt(opts["maxRounds"] as string, 10),
@@ -75,6 +74,8 @@ program
       keepGenerated: opts["keepGenerated"] as boolean,
       model: opts["model"] as string | undefined,
       verbose: opts["verbose"] as boolean,
+      resume: opts["resume"] as string | undefined,
+      coreOnly: !(opts["full"] as boolean),
     };
 
     const absTarget = path.resolve(targetDir);
@@ -83,9 +84,12 @@ program
     console.log(chalk.dim(`  Target: ${absTarget}`));
     console.log(
       chalk.dim(
-        `  Config: max ${options.maxRounds} rounds, threshold ${options.threshold}, CLI: ${options.cli}`,
+        `  Config: max ${options.maxRounds} rounds, threshold ${options.threshold}, CLI: ${options.cli}, mode: ${options.coreOnly ? "core-only" : "full"}`,
       ),
     );
+    if (options.resume) {
+      console.log(chalk.cyan(`  Resuming from: ${path.resolve(options.resume)}`));
+    }
     console.log();
 
     // Preflight
@@ -107,7 +111,9 @@ program
     }
 
     // Setup reporter
-    const reporter = new Reporter(options.output);
+    const reporter = options.resume
+      ? Reporter.fromExisting(options.resume)
+      : new Reporter(options.output);
     console.log(chalk.dim(`  Output: ${reporter.getSessionDir()}\n`));
 
     // Run verification loop
@@ -127,6 +133,16 @@ program
           chalk.bold(`\n  Round ${round}/${maxRounds}`),
         );
       },
+      onSkipRound: (round, score) => {
+        console.log(
+          chalk.dim(`  Skipped (cached score: ${score}/100)`),
+        );
+      },
+      onSkipMember: (_round) => {
+        console.log(
+          chalk.dim("  Member skipped (generated code exists)"),
+        );
+      },
       onMemberStart: (round) => {
         spinner = ora(`  Member executing (round ${round})...`).start();
       },
@@ -136,6 +152,9 @@ program
         } else {
           spinner?.succeed("  Member completed");
         }
+        spinner = null;
+      },
+      onComparisonStart: (_round) => {
         spinner = ora("  Comparing codebases...").start();
       },
       onComparisonComplete: (round, score, threshold) => {
