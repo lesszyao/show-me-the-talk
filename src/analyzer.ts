@@ -206,7 +206,21 @@ ${coreOnlyInstruction}
       logLabel: "analyzer-refine",
     });
 
-    const fileContent = readTalkFiles(outputDir);
+    let fileContent = readTalkFiles(outputDir);
+
+    // If refiner didn't write new chapter files, copy previous chapters as base
+    if (!fileContent && prevDir && fs.existsSync(prevDir)) {
+      const prevFiles = fs.readdirSync(prevDir)
+        .filter((f) => f.endsWith(".md") && !f.includes("-prompt.md") && !f.includes("-output."));
+      if (prevFiles.length > 0) {
+        for (const f of prevFiles) {
+          fs.copyFileSync(path.join(prevDir, f), path.join(outputDir, f));
+        }
+        console.log(`  [analyzer] Refiner wrote no files — copied ${prevFiles.length} chapters from previous version`);
+        fileContent = readTalkFiles(outputDir);
+      }
+    }
+
     const content = fileContent || stdout;
 
     if (!content) {
@@ -215,8 +229,9 @@ ${coreOnlyInstruction}
       );
     }
 
-    if (fileContent) {
-      console.log(`  [analyzer] Refined: ${fs.readdirSync(outputDir).filter(f => f.endsWith(".md") && !f.includes("-prompt.md") && !f.includes("-output.")).length} files in ${outputDir}`);
+    const talkFileCount = fs.readdirSync(outputDir).filter(f => f.endsWith(".md") && !f.includes("-prompt.md") && !f.includes("-output.")).length;
+    if (talkFileCount > 0) {
+      console.log(`  [analyzer] Refined: ${talkFileCount} files in ${outputDir}`);
     } else {
       console.log(`  [analyzer] Refined: stdout (${stdout.length} chars, no files written)`);
     }

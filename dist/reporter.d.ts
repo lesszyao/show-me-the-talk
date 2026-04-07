@@ -13,7 +13,10 @@ export declare class Reporter {
     }): void;
     writeComparison(round: number, result: RoundResult): void;
     copyGeneratedCode(round: number, generatedDir: string): void;
-    writeFinalReport(report: AnalysisReport): void;
+    writeFinalReport(report: AnalysisReport): {
+        htmlPath: string;
+    };
+    private writeHtmlPreview;
     getLatestTalkVersion(): number;
     readTalk(version: number): Talk | null;
     hasGeneratedCode(round: number): boolean;

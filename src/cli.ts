@@ -217,6 +217,26 @@ program
         chalk.dim(`  Output: ${reporter.getSessionDir()}`),
       );
       console.log();
+
+      // Show final talk paths
+      const sessionDir = reporter.getSessionDir();
+      const talkFinalMd = path.join(sessionDir, "talk-final.md");
+      const talkFinalDir = path.join(sessionDir, "talk-final");
+      const talkFinalHtml = path.join(sessionDir, "talk-final.html");
+      console.log(`  📄 Talk:     ${chalk.cyan(talkFinalMd)}`);
+      if (fs.existsSync(talkFinalDir)) {
+        console.log(`  📂 Chapters: ${chalk.cyan(talkFinalDir + "/")}`);
+      }
+      if (fs.existsSync(talkFinalHtml)) {
+        console.log(`  🌐 Preview:  ${chalk.cyan(talkFinalHtml)}`);
+        try {
+          const cmd = process.platform === "darwin" ? "open" : process.platform === "win32" ? "start" : "xdg-open";
+          execSync(`${cmd} "${talkFinalHtml}"`, { stdio: "ignore" });
+        } catch {
+          // Ignore if browser open fails
+        }
+      }
+      console.log();
     } catch (error) {
       console.error(
         chalk.red(
