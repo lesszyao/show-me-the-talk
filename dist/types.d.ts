@@ -67,3 +67,18 @@ export interface ComparisonResult {
     /** Path to the detailed diff report .md file */
     reportPath: string;
 }
+export interface GroupDef {
+    name: string;
+    files: string[];
+    desc: string;
+}
+export interface SkeletonResult {
+    skeletonDir: string;
+    groups: GroupDef[];
+}
+export interface MemberGroupResult {
+    group: GroupDef;
+    generatedDir: string;
+    timedOut: boolean;
+    exitCode: number | null;
+}

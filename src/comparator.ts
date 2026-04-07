@@ -48,6 +48,7 @@ export class Comparator {
     generatedDir: string,
     reportDir: string,
     coreOnly = false,
+    logDir?: string,
   ): Promise<ComparisonResult> {
     const absReportDir = path.resolve(reportDir);
     const reportPath = path.join(absReportDir, "diff-report.md");
@@ -115,7 +116,7 @@ ${jsonFormat}
         addDirs: [absOriginal, absGenerated],
         dangerouslySkipPermissions: true,
         allowEmptyOutput: true,
-        logDir: absReportDir,
+        logDir: logDir || absReportDir,
         logLabel: "comparator",
       });
 

@@ -58,7 +58,7 @@ program
   .option("--threshold <n>", "Pass threshold 0-100", "70")
   .option("--cli <name>", "CLI command to use (claude, cfuse, codex, etc.)", "claude")
   .option("--timeout <ms>", "Member execution timeout in ms", "1800000")
-  .option("--output <dir>", "Output directory", "./output")
+  .option("--output <dir>", "Output directory", "./.smtt")
   .option("--keep-generated", "Keep all rounds' generated code", false)
   .option("--model <id>", "Model for Analyzer/Comparator API calls")
   .option("--full", "Full mode: generate and verify all files (default: core-only)", false)
@@ -127,6 +127,13 @@ program
           spinner?.succeed(`  Talk v${talk.version} generated`);
           spinner = null;
         }
+      },
+      onSkeletonStart: () => {
+        spinner = ora("  Generating skeleton...").start();
+      },
+      onSkeletonComplete: (groupCount) => {
+        spinner?.succeed(`  Skeleton generated (${groupCount} groups)`);
+        spinner = null;
       },
       onRoundStart: (round, maxRounds) => {
         console.log(

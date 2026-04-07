@@ -1,5 +1,4 @@
 import * as fs from "node:fs";
-import * as os from "node:os";
 import * as path from "node:path";
 import { runCli } from "./claude-cli.js";
 const ROLE_CONTEXT = `你是一名资深软件架构师。你的任务是分析代码库，生成一份纯自然语言的项目描述（"talk"）。
@@ -59,8 +58,8 @@ export class Analyzer {
         this.cli = cli;
         this.model = model;
     }
-    async generate(targetDir, scanResult, coreOnly = false) {
-        const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "smtt-talk-"));
+    async generate(targetDir, scanResult, coreOnly, outputDir, logDir) {
+        fs.mkdirSync(outputDir, { recursive: true });
         const coreOnlyInstruction = coreOnly
             ? `\n注意：本次分析采用 core-only 模式。请重点描述：
 - 核心源码模块（src/、lib/ 下的主要文件）
@@ -112,7 +111,7 @@ ${formatFileList(scanResult.files)}
             cwd: targetDir,
             dangerouslySkipPermissions: true,
             allowEmptyOutput: true,
-            logDir: outputDir,
+            logDir,
             logLabel: "analyzer-generate",
         });
         // Prefer file-based output, fall back to stdout
@@ -134,8 +133,8 @@ ${formatFileList(scanResult.files)}
             generatedAt: new Date().toISOString(),
         };
     }
-    async refine(targetDir, talk, reportPath, coreOnly = false) {
-        const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "smtt-talk-"));
+    async refine(targetDir, talk, reportPath, coreOnly, outputDir, logDir) {
+        fs.mkdirSync(outputDir, { recursive: true });
         const absTarget = path.resolve(targetDir);
         const prevDir = talk.contentDir;
         const addDirs = [absTarget];
@@ -182,7 +181,7 @@ ${coreOnlyInstruction}
             addDirs,
             dangerouslySkipPermissions: true,
             allowEmptyOutput: true,
-            logDir: outputDir,
+            logDir,
             logLabel: "analyzer-refine",
         });
         let fileContent = readTalkFiles(outputDir);

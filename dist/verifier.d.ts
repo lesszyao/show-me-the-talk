@@ -3,6 +3,8 @@ import { Reporter } from "./reporter.js";
 export interface VerifierCallbacks {
     onRoundStart?: (round: number, maxRounds: number) => void;
     onTalkGenerated?: (talk: Talk) => void;
+    onSkeletonStart?: () => void;
+    onSkeletonComplete?: (groupCount: number) => void;
     onMemberStart?: (round: number) => void;
     onMemberComplete?: (round: number, timedOut: boolean) => void;
     onComparisonStart?: (round: number) => void;

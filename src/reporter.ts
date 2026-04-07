@@ -152,6 +152,48 @@ export class Reporter {
     return htmlPath;
   }
 
+  // --- Workspace directory management ---
+
+  private ensureDir(dir: string): string {
+    fs.mkdirSync(dir, { recursive: true });
+    return dir;
+  }
+
+  getWorkspaceDir(): string {
+    return this.ensureDir(path.join(this.sessionDir, "workspace"));
+  }
+
+  getLogsDir(): string {
+    return this.ensureDir(path.join(this.sessionDir, "workspace", "logs"));
+  }
+
+  getContextDir(): string {
+    return this.ensureDir(path.join(this.sessionDir, "workspace", "context"));
+  }
+
+  getTalkDir(version: number): string {
+    return this.ensureDir(path.join(this.sessionDir, "workspace", "talk", `v${version}`));
+  }
+
+  getSkeletonDir(): string {
+    return this.ensureDir(path.join(this.sessionDir, "workspace", "skeleton"));
+  }
+
+  getGeneratedGroupDir(groupName: string): string {
+    return this.ensureDir(path.join(this.sessionDir, "workspace", "generated", `group-${groupName}`));
+  }
+
+  getMergedDir(): string {
+    return this.ensureDir(path.join(this.sessionDir, "workspace", "merged"));
+  }
+
+  getReportsDir(round?: number): string {
+    const base = round
+      ? path.join(this.sessionDir, "workspace", "reports", `round-${round}`)
+      : path.join(this.sessionDir, "workspace", "reports");
+    return this.ensureDir(base);
+  }
+
   // --- Resume helpers ---
 
   getLatestTalkVersion(): number {

@@ -6,6 +6,6 @@ export declare class Analyzer {
     private cli;
     private model?;
     constructor(cli: string, model?: string);
-    generate(targetDir: string, scanResult: ScanResult, coreOnly?: boolean): Promise<Talk>;
-    refine(targetDir: string, talk: Talk, reportPath: string, coreOnly?: boolean): Promise<Talk>;
+    generate(targetDir: string, scanResult: ScanResult, coreOnly: boolean, outputDir: string, logDir: string): Promise<Talk>;
+    refine(targetDir: string, talk: Talk, reportPath: string, coreOnly: boolean, outputDir: string, logDir: string): Promise<Talk>;
 }

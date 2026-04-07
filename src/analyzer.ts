@@ -1,5 +1,4 @@
 import * as fs from "node:fs";
-import * as os from "node:os";
 import * as path from "node:path";
 import { runCli } from "./claude-cli.js";
 import type { ScanResult, Talk } from "./types.js";
@@ -64,8 +63,14 @@ export class Analyzer {
     this.model = model;
   }
 
-  async generate(targetDir: string, scanResult: ScanResult, coreOnly = false): Promise<Talk> {
-    const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "smtt-talk-"));
+  async generate(
+    targetDir: string,
+    scanResult: ScanResult,
+    coreOnly: boolean,
+    outputDir: string,
+    logDir: string,
+  ): Promise<Talk> {
+    fs.mkdirSync(outputDir, { recursive: true });
 
     const coreOnlyInstruction = coreOnly
       ? `\n注意：本次分析采用 core-only 模式。请重点描述：
@@ -120,7 +125,7 @@ ${formatFileList(scanResult.files)}
       cwd: targetDir,
       dangerouslySkipPermissions: true,
       allowEmptyOutput: true,
-      logDir: outputDir,
+      logDir,
       logLabel: "analyzer-generate",
     });
 
@@ -148,8 +153,15 @@ ${formatFileList(scanResult.files)}
     };
   }
 
-  async refine(targetDir: string, talk: Talk, reportPath: string, coreOnly = false): Promise<Talk> {
-    const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "smtt-talk-"));
+  async refine(
+    targetDir: string,
+    talk: Talk,
+    reportPath: string,
+    coreOnly: boolean,
+    outputDir: string,
+    logDir: string,
+  ): Promise<Talk> {
+    fs.mkdirSync(outputDir, { recursive: true });
     const absTarget = path.resolve(targetDir);
 
     const prevDir = talk.contentDir;
@@ -202,7 +214,7 @@ ${coreOnlyInstruction}
       addDirs,
       dangerouslySkipPermissions: true,
       allowEmptyOutput: true,
-      logDir: outputDir,
+      logDir,
       logLabel: "analyzer-refine",
     });
 

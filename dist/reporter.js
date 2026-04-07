@@ -115,6 +115,38 @@ export class Reporter {
         fs.writeFileSync(htmlPath, html, "utf-8");
         return htmlPath;
     }
+    // --- Workspace directory management ---
+    ensureDir(dir) {
+        fs.mkdirSync(dir, { recursive: true });
+        return dir;
+    }
+    getWorkspaceDir() {
+        return this.ensureDir(path.join(this.sessionDir, "workspace"));
+    }
+    getLogsDir() {
+        return this.ensureDir(path.join(this.sessionDir, "workspace", "logs"));
+    }
+    getContextDir() {
+        return this.ensureDir(path.join(this.sessionDir, "workspace", "context"));
+    }
+    getTalkDir(version) {
+        return this.ensureDir(path.join(this.sessionDir, "workspace", "talk", `v${version}`));
+    }
+    getSkeletonDir() {
+        return this.ensureDir(path.join(this.sessionDir, "workspace", "skeleton"));
+    }
+    getGeneratedGroupDir(groupName) {
+        return this.ensureDir(path.join(this.sessionDir, "workspace", "generated", `group-${groupName}`));
+    }
+    getMergedDir() {
+        return this.ensureDir(path.join(this.sessionDir, "workspace", "merged"));
+    }
+    getReportsDir(round) {
+        const base = round
+            ? path.join(this.sessionDir, "workspace", "reports", `round-${round}`)
+            : path.join(this.sessionDir, "workspace", "reports");
+        return this.ensureDir(base);
+    }
     // --- Resume helpers ---
     getLatestTalkVersion() {
         if (!fs.existsSync(this.sessionDir))

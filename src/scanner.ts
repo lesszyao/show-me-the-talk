@@ -1,11 +1,15 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { runCli } from "./claude-cli.js";
 import type { FileEntry, ProjectMetadata, ScanResult } from "./types.js";
+
+export const MAX_CORE_FILES = 80;
 
 const DEFAULT_IGNORE = [
   "node_modules",
   "dist",
   "build",
+  "output",
   ".git",
   ".next",
   ".nuxt",
@@ -13,6 +17,11 @@ const DEFAULT_IGNORE = [
   "__pycache__",
   ".cache",
   ".turbo",
+  // Language-specific dependency directories
+  "vendor",        // Go, PHP, Ruby
+  "venv", ".venv", // Python
+  "target",        // Rust, Java/Maven
+  ".bundle",       // Ruby
 ];
 
 const BINARY_EXTENSIONS = new Set([
@@ -186,6 +195,7 @@ const PERIPHERAL_DIRS = new Set([
   "fixtures", "mocks", "__mocks__",
   ".github", ".circleci", ".husky",
   "scripts", "examples", "samples",
+  "generated", "gen", "proto",
 ]);
 
 /** Extensions to exclude in core-only mode */
@@ -202,6 +212,9 @@ const PERIPHERAL_EXTENSIONS = new Set([
 const CORE_KEEP_FILES = new Set([
   "package.json",
   "tsconfig.json",
+  "go.mod",
+  "Cargo.toml",
+  "pyproject.toml",
   "vite.config.js", "vite.config.ts",
   "webpack.config.js", "webpack.config.ts",
   "next.config.js", "next.config.ts", "next.config.mjs",
@@ -227,8 +240,8 @@ export function getCoreFiles(scanResult: ScanResult): ScanResult {
     const ext = path.extname(f.relativePath).toLowerCase();
     const parts = f.relativePath.split(path.sep);
 
-    // Always include whitelisted config files
-    if (CORE_KEEP_FILES.has(basename)) return true;
+    // Always include whitelisted config files (at root only)
+    if (CORE_KEEP_FILES.has(basename) && parts.length === 1) return true;
 
     // Exclude files in peripheral directories
     if (parts.some((p) => PERIPHERAL_DIRS.has(p))) return false;
@@ -239,9 +252,6 @@ export function getCoreFiles(scanResult: ScanResult): ScanResult {
     // Include source code files
     if (SOURCE_EXTENSIONS.has(ext)) return true;
 
-    // Include extensionless files at root (entry points like Makefile, Dockerfile)
-    if (!ext && parts.length === 1) return true;
-
     return false;
   });
 
@@ -250,6 +260,140 @@ export function getCoreFiles(scanResult: ScanResult): ScanResult {
     metadata: scanResult.metadata,
     fileCount: coreFiles.length,
   };
+}
+
+/** Read README content for project context */
+function readProjectContext(targetDir: string): string {
+  const readmeNames = ["README.md", "README", "readme.md", "README.rst", "README.txt"];
+  for (const name of readmeNames) {
+    const readmePath = path.join(targetDir, name);
+    if (fs.existsSync(readmePath)) {
+      const content = fs.readFileSync(readmePath, "utf-8");
+      // Truncate to avoid huge READMEs
+      return content.slice(0, 3000);
+    }
+  }
+  return "";
+}
+
+/** Format metadata for the AI prompt */
+function formatMetaForSelection(metadata: ProjectMetadata): string {
+  const parts: string[] = [];
+  if (metadata.name) parts.push(`Project: ${metadata.name}`);
+  if (metadata.description) parts.push(`Description: ${metadata.description}`);
+  if (metadata.dependencies) {
+    parts.push(`Dependencies: ${Object.keys(metadata.dependencies).join(", ")}`);
+  }
+  if (metadata.entryPoint) parts.push(`Entry point: ${metadata.entryPoint}`);
+  return parts.join("\n") || "No metadata available";
+}
+
+/**
+ * Use AI to select the most important core files from a large file list.
+ * Falls back to simple truncation if AI call fails.
+ */
+export async function selectCoreFiles(
+  scanResult: ScanResult,
+  targetDir: string,
+  cli: string,
+  model?: string,
+  logDir?: string,
+): Promise<ScanResult> {
+  const fileList = scanResult.files.map((f) => f.relativePath);
+  const readme = readProjectContext(targetDir);
+  const metadata = formatMetaForSelection(scanResult.metadata);
+
+  const prompt = `You are a senior software architect. Given a project's file list, README, and metadata, select the ${MAX_CORE_FILES} most important files that represent the **core implementation** of this project.
+
+Selection criteria (prioritize in this order):
+1. Entry points and main application files (main, app, server, cmd/)
+2. Core business logic modules (the unique logic that makes this project what it is)
+3. Key data models, schemas, and type definitions
+4. Core API/route handlers and middleware
+5. Important configuration files (at project root only)
+
+DO NOT prioritize:
+- Generic utility/helper files (logger, utils, helpers, common)
+- Infrastructure code (database connections, caching wrappers)
+- Files that are mostly re-exports or barrel files (index.ts that only re-export)
+- Generated code or protobuf definitions
+
+Project metadata:
+${metadata}
+
+${readme ? `README (truncated):\n${readme}\n` : ""}
+
+File list (${fileList.length} files):
+${fileList.map((f) => `  - ${f}`).join("\n")}
+
+Reply with ONLY a JSON array of selected file paths (up to ${MAX_CORE_FILES} files), nothing else. Example:
+["src/app.ts", "src/core/engine.ts", ...]`;
+
+  try {
+    const stdout = await runCli({
+      cli,
+      prompt,
+      model,
+      cwd: targetDir,
+      dangerouslySkipPermissions: true,
+      timeout: 300_000, // 5 min for file selection
+      maxRetries: 2,
+      logDir,
+      logLabel: "scanner-select",
+    });
+
+    // Parse JSON array from response — extract first [...] block
+    const arrMatch = stdout.match(/\[[\s\S]*\]/);
+    if (!arrMatch) {
+      throw new Error("AI response contains no JSON array");
+    }
+    const selected: string[] = JSON.parse(arrMatch[0]);
+
+    if (!Array.isArray(selected) || selected.length === 0) {
+      throw new Error("AI returned empty or invalid selection");
+    }
+
+    // Map selected paths back to FileEntry objects, preserving order
+    const fileMap = new Map(scanResult.files.map((f) => [f.relativePath, f]));
+    const selectedFiles: FileEntry[] = [];
+    for (const filePath of selected) {
+      const entry = fileMap.get(filePath);
+      if (entry) {
+        selectedFiles.push(entry);
+      }
+    }
+
+    // Ensure whitelisted config files are always included
+    for (const file of scanResult.files) {
+      const basename = path.basename(file.relativePath);
+      const parts = file.relativePath.split(path.sep);
+      if (CORE_KEEP_FILES.has(basename) && parts.length === 1) {
+        if (!selectedFiles.some((f) => f.relativePath === file.relativePath)) {
+          selectedFiles.push(file);
+        }
+      }
+    }
+
+    const cappedFiles = selectedFiles.slice(0, MAX_CORE_FILES);
+    console.log(`  [scanner] AI selected ${cappedFiles.length} core files (from ${scanResult.fileCount})`);
+
+    return {
+      files: cappedFiles,
+      metadata: scanResult.metadata,
+      fileCount: cappedFiles.length,
+    };
+  } catch (error) {
+    console.log(`  [scanner] AI selection failed: ${error instanceof Error ? error.message : String(error)}`);
+    console.log(`  [scanner] Falling back to first ${MAX_CORE_FILES} files by priority`);
+
+    // Fallback: take first N files (already sorted by priority from scan)
+    const fallback = scanResult.files.slice(0, MAX_CORE_FILES);
+    return {
+      files: fallback,
+      metadata: scanResult.metadata,
+      fileCount: fallback.length,
+    };
+  }
 }
 
 export function scan(targetDir: string): ScanResult {

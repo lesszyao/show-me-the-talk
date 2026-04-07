@@ -37,7 +37,7 @@ export class Comparator {
         this.cli = cli;
         this.model = model;
     }
-    async compare(originalDir, generatedDir, reportDir, coreOnly = false) {
+    async compare(originalDir, generatedDir, reportDir, coreOnly = false, logDir) {
         const absReportDir = path.resolve(reportDir);
         const reportPath = path.join(absReportDir, "diff-report.md");
         const scoresPath = path.join(absReportDir, "scores.json");
@@ -99,7 +99,7 @@ ${jsonFormat}
                 addDirs: [absOriginal, absGenerated],
                 dangerouslySkipPermissions: true,
                 allowEmptyOutput: true,
-                logDir: absReportDir,
+                logDir: logDir || absReportDir,
                 logLabel: "comparator",
             });
             // Try stdout first, then fall back to scores.json file

@@ -4,39 +4,31 @@ Reverse-engineer natural language descriptions from codebases and validate them 
 
 SMTT analyzes a codebase, produces a detailed natural-language description ("talk"), then validates it by having an AI regenerate the code from that description alone. A comparator scores the structural equivalence, and the process iterates until the description is accurate enough.
 
-## How It Works
+## Architecture
 
-```
-Scanner ──► getCoreFiles() ──► Analyzer ──► Talk v1
-                                              │
-                              ┌────── Round Loop (max N) ──────┐
-                              │                                │
-                              │  Member ──► Generated Code     │
-                              │                │               │
-                              │         Comparator             │
-                              │          │        │            │
-                              │     Score ≥ 70?   diff-report  │
-                              │      │                │        │
-                              │     Yes              No        │
-                              │      │         ┌─────┴─────┐   │
-                              │      ▼         ▼           ▼   │
-                              │    Done    Analyzer     Member  │
-                              │           .refine()  (Fix mode) │
-                              │              │           │      │
-                              │           Talk v2   Fixed Code  │
-                              │              └─────►─────┘      │
-                              └────────────────────────────────┘
-```
+![smtt Architecture](imgs/smtt-architecture-flowchart.png)
 
-**Roles:**
+### Pipeline
+
+1. **Scanner** — Walks the codebase, classifies files by priority, extracts metadata
+2. **Core Filter** — Filters to core source files (excludes tests, docs, assets, vendor)
+3. **AI Select** — When core files exceed 80, AI selects the most important files
+4. **Analyzer** — Reads source code, produces chapter-based `.md` descriptions ("Talk")
+5. **Skeleton** — Generates project skeleton: type definitions, interfaces, function stubs + `groups.json` for module grouping
+6. **Parallel Members** — Each module group is implemented independently in parallel by separate CLI subprocesses
+7. **Merge** — Combines skeleton base + group implementations into a complete codebase
+8. **Comparator** — Compares original vs generated code, scores across 5 dimensions (0-100), writes diff report
+9. **Decision** — If score >= threshold: done. Otherwise: Analyzer refines the Talk, and parallel members re-run with fix context
+
+### Roles
 
 | Role | Responsibility |
 |------|----------------|
 | **Scanner** | Walks the codebase, classifies files by priority, filters to core files |
-| **Analyzer** | Reads source code, produces chapter-based `.md` descriptions |
-| **Member** | Generates code from the description (round 1: from scratch; round 2+: fix mode) |
+| **Analyzer** | Reads source code, produces chapter-based `.md` descriptions; refines based on diff reports |
+| **Skeleton** | Generates project structure with type definitions, interfaces, and function stubs; partitions files into implementation groups |
+| **Members** | Implement code from the description in parallel by module group (round 1: from scratch; round 2+: fix mode with diff report) |
 | **Comparator** | Compares original vs generated code, scores across 5 dimensions, writes diff report |
-| **Refiner** | Improves the description based on the diff report |
 
 ## Install
 
@@ -62,7 +54,7 @@ smtt analyze /path/to/project --cli codex
 smtt analyze /path/to/project --threshold 80 --max-rounds 10
 
 # Resume a previous session
-smtt analyze /path/to/project --resume ./output/2026-04-07T05-51-58
+smtt analyze /path/to/project --resume ./.smtt/2026-04-07T05-51-58
 ```
 
 ## Options
@@ -73,7 +65,7 @@ smtt analyze /path/to/project --resume ./output/2026-04-07T05-51-58
 | `--max-rounds <n>` | `5` | Maximum iteration rounds |
 | `--threshold <n>` | `70` | Pass threshold (0-100) |
 | `--timeout <ms>` | `1800000` | Member execution timeout (30min) |
-| `--output <dir>` | `./output` | Output directory |
+| `--output <dir>` | `./.smtt` | Output directory |
 | `--model <id>` | - | Model for Analyzer/Comparator |
 | `--full` | `false` | Full mode (all files, not just core) |
 | `--keep-generated` | `false` | Keep all rounds' generated code |
@@ -85,20 +77,33 @@ smtt analyze /path/to/project --resume ./output/2026-04-07T05-51-58
 Each session creates a timestamped directory under `./output/`:
 
 ```
-output/2026-04-07T05-51-58/
-  talk-v1/              # Natural language description (chapter .md files)
-  talk-v2/              # Refined description
+.smtt/2026-04-07T05-51-58/
+  workspace/
+    talk/
+      v1/                # Talk chapters (01-项目概述.md, 02-技术栈.md, ...)
+      v2/                # Refined talk
+    skeleton/            # Project skeleton (types, interfaces, stubs)
+    generated/
+      group-round-1/
+        group-core/      # Parallel group implementations
+        group-api/
+        ...
+    merged/              # Skeleton + group overlays combined
+    logs/                # All CLI prompts and output logs
+    reports/
+      round-1/
+        diff-report.md   # Detailed comparison report
+        scores.json      # Dimension scores
+    context/
+      selected-files.json # AI-selected core files (if applicable)
   rounds/
     round-1/
-      member-prompt.md  # Prompt sent to member
-      member.log        # Member execution log
-      generated-code/   # Code generated from description
-      diff-report.md    # Detailed comparison report
-      scores.json       # Dimension scores
-      comparison.json   # Round result
-    round-2/
-      ...
-  report.json           # Final summary
+      generated-code/    # Snapshot of generated code
+      comparison.json    # Round result
+  report.json            # Final summary
+  talk-final.md          # Best talk as single file
+  talk-final/            # Best talk chapters
+  talk-final.html        # HTML preview (auto-opens in browser)
 ```
 
 ## Scoring Dimensions

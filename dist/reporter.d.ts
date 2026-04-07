@@ -17,6 +17,15 @@ export declare class Reporter {
         htmlPath: string;
     };
     private writeHtmlPreview;
+    private ensureDir;
+    getWorkspaceDir(): string;
+    getLogsDir(): string;
+    getContextDir(): string;
+    getTalkDir(version: number): string;
+    getSkeletonDir(): string;
+    getGeneratedGroupDir(groupName: string): string;
+    getMergedDir(): string;
+    getReportsDir(round?: number): string;
     getLatestTalkVersion(): number;
     readTalk(version: number): Talk | null;
     hasGeneratedCode(round: number): boolean;
