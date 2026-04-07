@@ -44,7 +44,7 @@ Scanner ──► getCoreFiles() ──► Analyzer ──► Talk v1
 npm install -g show-me-the-talk
 ```
 
-Requires [Claude Code](https://docs.anthropic.com/en/docs/claude-code) or a compatible CLI (e.g., `cfuse`, `codex`) installed and authenticated.
+Requires [Claude Code](https://docs.anthropic.com/en/docs/claude-code) or a compatible CLI (e.g., `codex`) installed and authenticated.
 
 ## Usage
 
@@ -56,7 +56,7 @@ smtt analyze /path/to/project
 smtt analyze /path/to/project --full
 
 # Use a different CLI
-smtt analyze /path/to/project --cli cfuse
+smtt analyze /path/to/project --cli codex
 
 # Custom threshold and rounds
 smtt analyze /path/to/project --threshold 80 --max-rounds 10

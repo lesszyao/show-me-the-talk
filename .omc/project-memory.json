@@ -132,6 +132,12 @@
       "type": "file"
     },
     {
+      "path": "README.md",
+      "accessCount": 3,
+      "lastAccessed": 1775547552493,
+      "type": "file"
+    },
+    {
       "path": "package.json",
       "accessCount": 2,
       "lastAccessed": 1775547316355,
@@ -159,12 +165,6 @@
       "path": "LICENSE",
       "accessCount": 1,
       "lastAccessed": 1775547316337,
-      "type": "file"
-    },
-    {
-      "path": "README.md",
-      "accessCount": 1,
-      "lastAccessed": 1775547353771,
       "type": "file"
     }
   ],
