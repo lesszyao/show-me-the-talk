@@ -47,6 +47,9 @@ export class Verifier {
             this.reporter.writeTalk(talk);
             this.callbacks.onTalkGenerated?.(talk);
         }
+        // Track previous round for iterative fix mode
+        let prevGeneratedDir;
+        let prevReportPath;
         for (let round = 1; round <= this.options.maxRounds; round++) {
             const roundStart = Date.now();
             this.callbacks.onRoundStart?.(round, this.options.maxRounds);
@@ -66,6 +69,9 @@ export class Verifier {
                     };
                     results.push(result);
                     this.callbacks.onSkipRound?.(round, existing.score);
+                    // Track for next round's fix context
+                    prevGeneratedDir = this.reporter.getGeneratedCodeDir(round);
+                    prevReportPath = existing.reportPath;
                     if (existing.score >= this.options.threshold) {
                         break;
                     }
@@ -86,9 +92,14 @@ export class Verifier {
                 this.callbacks.onSkipMember?.(round);
             }
             else {
+                // Build fix context for rounds 2+ (iterative improvement)
+                let fixCtx;
+                if (prevGeneratedDir && prevReportPath) {
+                    fixCtx = { previousDir: prevGeneratedDir, reportPath: prevReportPath };
+                }
                 // Execute member
                 this.callbacks.onMemberStart?.(round);
-                const memberResult = await member.execute(talk, this.options.cli, this.options.timeout, roundDir, coreOnly);
+                const memberResult = await member.execute(talk, this.options.cli, this.options.timeout, roundDir, coreOnly, fixCtx);
                 this.callbacks.onMemberComplete?.(round, memberResult.timedOut);
                 generatedDir = memberResult.generatedDir;
                 memberTimedOut = memberResult.timedOut;
@@ -115,6 +126,9 @@ export class Verifier {
                 results.push(result);
                 this.reporter.writeComparison(round, result);
                 this.callbacks.onComparisonComplete?.(round, 0, this.options.threshold);
+                // Track for next round even on timeout (member may have partial output)
+                prevGeneratedDir = generatedDir;
+                prevReportPath = undefined;
                 if (round < this.options.maxRounds) {
                     this.callbacks.onRefining?.(round);
                     talk = await this.analyzer.refine(targetDir, talk, "", coreOnly);
@@ -136,6 +150,9 @@ export class Verifier {
             };
             results.push(result);
             this.reporter.writeComparison(round, result);
+            // Track for next round's fix context
+            prevGeneratedDir = generatedDir;
+            prevReportPath = comparison.reportPath;
             if (this.options.keepGenerated && !isResume) {
                 this.reporter.copyGeneratedCode(round, generatedDir);
             }

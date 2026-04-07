@@ -42,11 +42,12 @@ function formatMetadata(metadata: ScanResult["metadata"]): string {
   return parts.join("\n") || "无元数据";
 }
 
-/** Read all .md files from a directory, sort by name, concatenate */
+/** Read all .md files from a directory, sort by name, concatenate.
+ *  Excludes log/prompt files written by runCli. */
 export function readTalkFiles(dir: string): string {
   if (!fs.existsSync(dir)) return "";
   const files = fs.readdirSync(dir)
-    .filter((f) => f.endsWith(".md"))
+    .filter((f) => f.endsWith(".md") && !f.includes("-prompt.md") && !f.includes("-output."))
     .sort();
   if (files.length === 0) return "";
   return files
@@ -134,7 +135,7 @@ ${formatFileList(scanResult.files)}
     }
 
     if (fileContent) {
-      console.log(`  [analyzer] Output: ${fs.readdirSync(outputDir).filter(f => f.endsWith(".md")).length} files in ${outputDir}`);
+      console.log(`  [analyzer] Output: ${fs.readdirSync(outputDir).filter(f => f.endsWith(".md") && !f.includes("-prompt.md") && !f.includes("-output.")).length} files in ${outputDir}`);
     } else {
       console.log(`  [analyzer] Output: stdout (${stdout.length} chars, no files written)`);
     }
@@ -215,7 +216,7 @@ ${coreOnlyInstruction}
     }
 
     if (fileContent) {
-      console.log(`  [analyzer] Refined: ${fs.readdirSync(outputDir).filter(f => f.endsWith(".md")).length} files in ${outputDir}`);
+      console.log(`  [analyzer] Refined: ${fs.readdirSync(outputDir).filter(f => f.endsWith(".md") && !f.includes("-prompt.md") && !f.includes("-output.")).length} files in ${outputDir}`);
     } else {
       console.log(`  [analyzer] Refined: stdout (${stdout.length} chars, no files written)`);
     }

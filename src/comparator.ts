@@ -49,7 +49,9 @@ export class Comparator {
     reportDir: string,
     coreOnly = false,
   ): Promise<ComparisonResult> {
-    const reportPath = path.join(reportDir, "diff-report.md");
+    const absReportDir = path.resolve(reportDir);
+    const reportPath = path.join(absReportDir, "diff-report.md");
+    const scoresPath = path.join(absReportDir, "scores.json");
     const absOriginal = path.resolve(originalDir);
     const absGenerated = path.resolve(generatedDir);
 
@@ -97,24 +99,41 @@ ${coreOnlyReportNote}
 - 给出改进建议：项目描述中应该如何修改才能让生成结果更接近原始代码
 - 这份报告会用于指导下一轮的描述改进，所以要具体、可操作
 
-任务二：输出 JSON 打分
-在完成报告后，在回复中输出以下 JSON 格式的打分结果（不要输出其他文字）：
-${jsonFormat}`;
+任务二：写 JSON 打分文件
+请将打分结果写入文件：${scoresPath}
+JSON 格式如下：
+${jsonFormat}
+
+同时，在回复中也输出这段 JSON（作为备份）。`;
 
     try {
       const output = await runCli({
         cli: this.cli,
         prompt,
         model: this.model,
-        cwd: reportDir,
+        cwd: absReportDir,
         addDirs: [absOriginal, absGenerated],
         dangerouslySkipPermissions: true,
         allowEmptyOutput: true,
-        logDir: reportDir,
+        logDir: absReportDir,
         logLabel: "comparator",
       });
 
-      const result = this.parseResponse(output, coreOnly);
+      // Try stdout first, then fall back to scores.json file
+      let result: Omit<ComparisonResult, "reportPath">;
+      try {
+        result = this.parseResponse(output, coreOnly);
+      } catch {
+        // stdout didn't contain valid JSON — try reading scores.json
+        if (fs.existsSync(scoresPath)) {
+          const scoresContent = fs.readFileSync(scoresPath, "utf-8");
+          console.log(`  [comparator] Parsed scores from file (stdout had no JSON)`);
+          result = this.parseResponse(scoresContent, coreOnly);
+        } else {
+          console.log(`  [comparator] Warning: no JSON in stdout and no scores.json found`);
+          throw new Error("No scores available");
+        }
+      }
 
       // If model didn't write the report file, create one from feedback
       if (!fs.existsSync(reportPath) && result.feedback) {

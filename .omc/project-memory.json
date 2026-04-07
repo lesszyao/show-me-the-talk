@@ -109,26 +109,62 @@
   "hotPaths": [
     {
       "path": "src/verifier.ts",
-      "accessCount": 8,
-      "lastAccessed": 1775530478738,
-      "type": "file"
-    },
-    {
-      "path": "src/analyzer.ts",
-      "accessCount": 5,
-      "lastAccessed": 1775530306311,
-      "type": "file"
-    },
-    {
-      "path": "src/comparator.ts",
-      "accessCount": 5,
-      "lastAccessed": 1775530423566,
+      "accessCount": 14,
+      "lastAccessed": 1775540867957,
       "type": "file"
     },
     {
       "path": "src/member.ts",
-      "accessCount": 3,
-      "lastAccessed": 1775530367952,
+      "accessCount": 10,
+      "lastAccessed": 1775540919515,
+      "type": "file"
+    },
+    {
+      "path": "src/comparator.ts",
+      "accessCount": 9,
+      "lastAccessed": 1775536140075,
+      "type": "file"
+    },
+    {
+      "path": "src/analyzer.ts",
+      "accessCount": 7,
+      "lastAccessed": 1775544754543,
+      "type": "file"
+    },
+    {
+      "path": "package.json",
+      "accessCount": 2,
+      "lastAccessed": 1775547316355,
+      "type": "file"
+    },
+    {
+      "path": "src/reporter.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775540854001,
+      "type": "directory"
+    },
+    {
+      "path": "imgs/02-flowchart-pipeline-v2.png",
+      "accessCount": 1,
+      "lastAccessed": 1775541531622,
+      "type": "file"
+    },
+    {
+      "path": "src/cli.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775547286865,
+      "type": "file"
+    },
+    {
+      "path": "LICENSE",
+      "accessCount": 1,
+      "lastAccessed": 1775547316337,
+      "type": "file"
+    },
+    {
+      "path": "README.md",
+      "accessCount": 1,
+      "lastAccessed": 1775547353771,
       "type": "file"
     }
   ],

@@ -4,6 +4,7 @@ import { Comparator } from "./comparator.js";
 import { Reporter } from "./reporter.js";
 import { getCoreFiles } from "./scanner.js";
 import * as member from "./member.js";
+import type { MemberFixContext } from "./member.js";
 
 export interface VerifierCallbacks {
   onRoundStart?: (round: number, maxRounds: number) => void;
@@ -74,6 +75,10 @@ export class Verifier {
       this.callbacks.onTalkGenerated?.(talk);
     }
 
+    // Track previous round for iterative fix mode
+    let prevGeneratedDir: string | undefined;
+    let prevReportPath: string | undefined;
+
     for (let round = 1; round <= this.options.maxRounds; round++) {
       const roundStart = Date.now();
       this.callbacks.onRoundStart?.(round, this.options.maxRounds);
@@ -94,6 +99,10 @@ export class Verifier {
           };
           results.push(result);
           this.callbacks.onSkipRound?.(round, existing.score);
+
+          // Track for next round's fix context
+          prevGeneratedDir = this.reporter.getGeneratedCodeDir(round);
+          prevReportPath = existing.reportPath;
 
           if (existing.score >= this.options.threshold) {
             break;
@@ -117,6 +126,12 @@ export class Verifier {
         generatedDir = this.reporter.getGeneratedCodeDir(round);
         this.callbacks.onSkipMember?.(round);
       } else {
+        // Build fix context for rounds 2+ (iterative improvement)
+        let fixCtx: MemberFixContext | undefined;
+        if (prevGeneratedDir && prevReportPath) {
+          fixCtx = { previousDir: prevGeneratedDir, reportPath: prevReportPath };
+        }
+
         // Execute member
         this.callbacks.onMemberStart?.(round);
         const memberResult = await member.execute(
@@ -125,6 +140,7 @@ export class Verifier {
           this.options.timeout,
           roundDir,
           coreOnly,
+          fixCtx,
         );
         this.callbacks.onMemberComplete?.(round, memberResult.timedOut);
         generatedDir = memberResult.generatedDir;
@@ -155,6 +171,10 @@ export class Verifier {
         this.reporter.writeComparison(round, result);
         this.callbacks.onComparisonComplete?.(round, 0, this.options.threshold);
 
+        // Track for next round even on timeout (member may have partial output)
+        prevGeneratedDir = generatedDir;
+        prevReportPath = undefined;
+
         if (round < this.options.maxRounds) {
           this.callbacks.onRefining?.(round);
           talk = await this.analyzer.refine(targetDir, talk, "", coreOnly);
@@ -179,6 +199,10 @@ export class Verifier {
 
       results.push(result);
       this.reporter.writeComparison(round, result);
+
+      // Track for next round's fix context
+      prevGeneratedDir = generatedDir;
+      prevReportPath = comparison.reportPath;
 
       if (this.options.keepGenerated && !isResume) {
         this.reporter.copyGeneratedCode(round, generatedDir);

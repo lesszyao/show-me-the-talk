@@ -5,4 +5,10 @@ export interface MemberResult {
     timedOut: boolean;
     exitCode: number | null;
 }
-export declare function execute(talk: Talk, cli: string, timeout: number, logDir: string, coreOnly?: boolean): Promise<MemberResult>;
+export interface MemberFixContext {
+    /** Previous round's generated code directory */
+    previousDir: string;
+    /** Path to the diff report from comparator */
+    reportPath: string;
+}
+export declare function execute(talk: Talk, cli: string, timeout: number, logDir: string, coreOnly?: boolean, fixCtx?: MemberFixContext): Promise<MemberResult>;
